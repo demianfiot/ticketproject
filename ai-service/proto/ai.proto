@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package ai;
+
+option go_package = "ai-service/proto;ai";
+
+service AIService {
+  rpc AnalyzeTicket(AnalyzeTicketRequest) returns (AnalyzeTicketResponse);
+}
+
+message AnalyzeTicketRequest {
+  string ticket_id = 1;
+  string title = 2;
+  string description = 3;
+  string user_id = 4;
+}
+
+message AnalyzeTicketResponse {
+  string summary = 1;
+  string category = 2;
+  string priority = 3;
+  string suggested_reply = 4;
+}

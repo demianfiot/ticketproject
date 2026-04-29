@@ -1,0 +1,12 @@
+kafka:
+  bootstrap_servers:
+    - 127.0.0.1:19092
+  topic_tickets: ticket.events
+  group_id: ticket-events-consumer
+
+clickhouse:
+  host: 127.0.0.1
+  port: 9000
+  database: default
+  user: default
+  password: clickhouse_password
