@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/demianfiot/ticketproject/auth-service/internal/metrics"
 	"github.com/demianfiot/ticketproject/auth-service/internal/repository"
 	"github.com/demianfiot/ticketproject/auth-service/internal/service"
 	httptransport "github.com/demianfiot/ticketproject/auth-service/internal/transport/http"
@@ -13,6 +14,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,7 +48,12 @@ func main() {
 	if port == "" {
 		port = "8081"
 	}
+	prometheus.MustRegister(
+		metrics.HTTPRequests,
+		metrics.HTTPDuration,
+	)
 
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	log.Printf("auth-service started on :%s", port)
 
 	if err := router.Run(":" + port); err != nil {

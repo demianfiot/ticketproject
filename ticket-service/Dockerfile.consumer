@@ -7,15 +7,16 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o ticket-service ./cmd/api
+RUN go build -o consumer ./cmd/consumer
 
 FROM alpine:latest
 
 WORKDIR /app
 
-COPY --from=builder /app/ticket-service .
+COPY --from=builder /app/consumer .
+
 COPY configs ./configs
 
-EXPOSE 8080
+EXPOSE 2112
 
-CMD ["./ticket-service"]
+CMD ["./consumer"]

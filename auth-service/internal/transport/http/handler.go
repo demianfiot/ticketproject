@@ -3,9 +3,11 @@ package http
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/demianfiot/ticketproject/auth-service/internal/metrics"
 	"github.com/demianfiot/ticketproject/auth-service/internal/service"
 )
 
@@ -20,6 +22,15 @@ func NewHandler(services *service.Service) *Handler {
 }
 
 func (h *Handler) RegisterUser(c *gin.Context) {
+	start := time.Now()
+
+	metrics.HTTPRequests.WithLabelValues("POST", "/register").Inc()
+
+	defer func() {
+		metrics.HTTPDuration.
+			WithLabelValues("/register").
+			Observe(time.Since(start).Seconds())
+	}()
 	var input RegisterUserRequest
 
 	if err := c.ShouldBindJSON(&input); err != nil {

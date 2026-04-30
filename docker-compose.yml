@@ -1,4 +1,56 @@
 services:
+
+  ticket-service:
+    build: ./ticket-service
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_started
+      clickhouse:
+        condition: service_started
+      ai-service:
+        condition: service_started
+    networks:
+      - ticket-network
+
+  auth-service:
+    build: ./auth-service
+    env_file:
+      - .env
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ticket-network
+
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "50051:50051"
+    networks:
+      - ticket-network
+
+  consumer:
+    build:
+      context: ./ticket-service
+      dockerfile: Dockerfile.consumer
+    env_file:
+      - .env
+    depends_on:
+      redpanda:
+        condition: service_started
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - ticket-network
+
   postgres:
     image: postgres:15-alpine
     container_name: supportflow-postgres
@@ -58,6 +110,12 @@ services:
       - "9000:9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user default --password clickhouse_password --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     networks:
       - ticket-network
 
@@ -70,12 +128,16 @@ services:
       - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - ticket-network
   
   grafana:
     image: grafana/grafana
     container_name: supportflow-grafana
     ports:
       - "3000:3000"
+    networks:
+      - ticket-network
 
 volumes:
   postgres_data:

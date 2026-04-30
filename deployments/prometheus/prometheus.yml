@@ -4,12 +4,12 @@ global:
 scrape_configs:
   - job_name: "ticket-service"
     static_configs:
-      - targets: ["host.docker.internal:8080"]
+      - targets: ["ticket-service:8080"]
 
   - job_name: "auth-service"
     static_configs:
-      - targets: ["host.docker.internal:8081"]
-
+      - targets: ["auth-service:8081"]
+      
   - job_name: "ticket-consumer"
     static_configs:
-      - targets: ["host.docker.internal:2112"]
+      - targets: ["consumer:2112"]
