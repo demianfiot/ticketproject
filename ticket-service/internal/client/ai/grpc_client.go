@@ -50,23 +50,32 @@ func (c *GRPCClient) Close() error {
 }
 
 func (c *GRPCClient) AnalyzeTicket(ctx context.Context, in AnalyzeInput) (AnalyzeResult, error) {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
+	var lastErr error
 
-	resp, err := c.client.AnalyzeTicket(ctx, &aipb.AnalyzeTicketRequest{
-		TicketId:    in.TicketID,
-		Title:       in.Title,
-		Description: in.Description,
-		UserId:      in.UserID,
-	})
-	if err != nil {
-		return AnalyzeResult{}, err
+	for attempt := 1; attempt <= 3; attempt++ {
+		callCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+
+		resp, err := c.client.AnalyzeTicket(callCtx, &aipb.AnalyzeTicketRequest{
+			TicketId:    in.TicketID,
+			Title:       in.Title,
+			Description: in.Description,
+			UserId:      in.UserID,
+		})
+
+		cancel()
+
+		if err == nil {
+			return AnalyzeResult{
+				Summary:        resp.Summary,
+				Category:       resp.Category,
+				Priority:       resp.Priority,
+				SuggestedReply: resp.SuggestedReply,
+			}, nil
+		}
+
+		lastErr = err
+		time.Sleep(200 * time.Millisecond)
 	}
 
-	return AnalyzeResult{
-		Summary:        resp.Summary,
-		Category:       resp.Category,
-		Priority:       resp.Priority,
-		SuggestedReply: resp.SuggestedReply,
-	}, nil
+	return AnalyzeResult{}, lastErr
 }

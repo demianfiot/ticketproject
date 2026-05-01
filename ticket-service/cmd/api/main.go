@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -62,9 +67,32 @@ func main() {
 		metrics.HTTPDuration,
 	)
 	log.Println("HTTP server started on :8080")
-	if err := router.Run(":8080"); err != nil {
-		log.Fatal(err)
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: router,
 	}
+
+	go func() {
+		log.Println("ticket-service started on :8080")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down ticket-service...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("server forced to shutdown: %v", err)
+	}
+
+	log.Println("ticket-service stopped")
 }
 
 type DBConfig struct {
@@ -77,7 +105,7 @@ type DBConfig struct {
 }
 
 func NewPostgresDB(cfg DBConfig) (*sqlx.DB, error) {
-	db, err := sqlx.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", cfg.Host, cfg.Port, cfg.Username, cfg.Password, cfg.DBName, cfg.SSLmode))
+	db, err := connectPostgresWithRetry(fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", cfg.Host, cfg.Port, cfg.Username, cfg.Password, cfg.DBName, cfg.SSLmode))
 	if err != nil {
 		return nil, err
 	}
@@ -103,4 +131,27 @@ func initConfig() error {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	return viper.ReadInConfig()
+}
+func connectPostgresWithRetry(dsn string) (*sqlx.DB, error) {
+	var db *sqlx.DB
+	var err error
+
+	for attempt := 1; attempt <= 10; attempt++ {
+		db, err = sqlx.Open("postgres", dsn)
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		err = db.Ping()
+		if err == nil {
+			return db, nil
+		}
+
+		db.Close()
+		log.Printf("postgres not ready, attempt %d/10: %v", attempt, err)
+		time.Sleep(2 * time.Second)
+	}
+
+	return nil, err
 }

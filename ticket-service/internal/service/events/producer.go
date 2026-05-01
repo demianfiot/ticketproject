@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -28,7 +29,7 @@ func (p *KafkaProducer) PublishTicketCreated(ctx context.Context, event TicketCr
 		return err
 	}
 
-	return p.writer.WriteMessages(ctx, kafka.Message{
+	msg := kafka.Message{
 		Key:   []byte(strconv.Itoa(event.TicketID)),
 		Value: payload,
 		Headers: []kafka.Header{
@@ -37,7 +38,26 @@ func (p *KafkaProducer) PublishTicketCreated(ctx context.Context, event TicketCr
 				Value: []byte(event.EventType),
 			},
 		},
-	})
+	}
+
+	var lastErr error
+
+	for attempt := 1; attempt <= 3; attempt++ {
+		writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+
+		err = p.writer.WriteMessages(writeCtx, msg)
+
+		cancel()
+
+		if err == nil {
+			return nil
+		}
+
+		lastErr = err
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	return lastErr
 }
 
 func (p *KafkaProducer) Close() error {

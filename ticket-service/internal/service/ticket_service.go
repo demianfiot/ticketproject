@@ -74,7 +74,6 @@ func (s *TicketService) CreateTicket(ctx context.Context, in CreateTicketInput) 
 	}
 
 	ticket.ID = id
-
 	analysis, err := s.aiClient.AnalyzeTicket(ctx, aiclient.AnalyzeInput{
 		TicketID:    fmt.Sprintf("%d", ticket.ID),
 		Title:       ticket.Title,
@@ -84,15 +83,20 @@ func (s *TicketService) CreateTicket(ctx context.Context, in CreateTicketInput) 
 
 	if err != nil {
 		log.Printf("failed to analyze ticket %d: %v", ticket.ID, err)
+
+		ticket.AISummary = "AI analysis unavailable"
+		ticket.AICategory = "unknown"
+		ticket.AIPriority = "low"
+		ticket.AISuggestedReply = "Support agent should review this ticket manually."
 	} else {
 		ticket.AISummary = analysis.Summary
 		ticket.AICategory = analysis.Category
 		ticket.AIPriority = analysis.Priority
 		ticket.AISuggestedReply = analysis.SuggestedReply
+	}
 
-		if updateErr := s.repo.UpdateTicketAIAnalysis(ctx, ticket); updateErr != nil {
-			log.Printf("failed to update ai analysis for ticket %d: %v", ticket.ID, updateErr)
-		}
+	if updateErr := s.repo.UpdateTicketAIAnalysis(ctx, ticket); updateErr != nil {
+		log.Printf("failed to update ai analysis for ticket %d: %v", ticket.ID, updateErr)
 	}
 
 	event := events.TicketCreatedEvent{
