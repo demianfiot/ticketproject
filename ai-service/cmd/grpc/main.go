@@ -3,6 +3,9 @@ package main
 import (
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
 	transport "github.com/demianfiot/ticketproject/ai-service/internal/transport/grpc"
 	ai "github.com/demianfiot/ticketproject/ai-service/proto"
@@ -25,5 +28,18 @@ func main() {
 	reflection.Register(grpcServer)
 
 	log.Println("gRPC server started on :50051")
-	log.Fatal(grpcServer.Serve(lis))
+	go func() {
+		log.Println("ai-service gRPC started on :50051")
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("failed to serve grpc: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down ai-service...")
+	grpcServer.GracefulStop()
+	log.Println("ai-service stopped")
 }
