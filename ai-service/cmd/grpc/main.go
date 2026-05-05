@@ -4,42 +4,84 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
+	"strconv"
+	"time"
 
-	transport "github.com/demianfiot/ticketproject/ai-service/internal/transport/grpc"
-	ai "github.com/demianfiot/ticketproject/ai-service/proto"
+	"github.com/demianfiot/ticketproject/ai-service/internal/config"
+	"github.com/demianfiot/ticketproject/ai-service/internal/llm"
+	"github.com/demianfiot/ticketproject/ai-service/internal/parser"
+	"github.com/demianfiot/ticketproject/ai-service/internal/prompt"
+	"github.com/demianfiot/ticketproject/ai-service/internal/service"
+	grpctransport "github.com/demianfiot/ticketproject/ai-service/internal/transport/grpc"
+	aipb "github.com/demianfiot/ticketproject/ai-service/proto"
 
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
 func main() {
-	lis, err := net.Listen("tcp", ":50051")
+	if err := initConfig(); err != nil {
+		log.Fatalf("failed to init config: %v", err)
+	}
+
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	promptBuilder := prompt.NewBuilder()
+	analysisParser := parser.NewParser()
+
+	llmClient := llm.NewOpenAIClient(
+		cfg.OpenAIAPIKey,
+		cfg.OpenAI.Model,
+		cfg.OpenAI.BaseURL,
+		time.Duration(cfg.OpenAI.TimeoutSeconds)*time.Second,
+		promptBuilder,
+		analysisParser,
+	)
+
+	analysisService := service.NewAnalysisService(llmClient)
+	handler := grpctransport.NewHandler(analysisService)
+
+	port := cfg.Server.GRPCPort
+	if port == "" {
+		port = "50051"
+	}
+
+	lis, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	grpcServer := grpc.NewServer()
-
-	handler := transport.NewHandler()
-	ai.RegisterAIServiceServer(grpcServer, handler)
-
+	aipb.RegisterAIServiceServer(grpcServer, handler)
 	reflection.Register(grpcServer)
 
-	log.Println("gRPC server started on :50051")
-	go func() {
-		log.Println("ai-service gRPC started on :50051")
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("failed to serve grpc: %v", err)
-		}
-	}()
+	log.Println("ai-service gRPC server started on :" + port)
+	log.Fatal(grpcServer.Serve(lis))
+}
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+func initConfig() error {
+	viper.AddConfigPath("configs")
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AutomaticEnv()
 
-	log.Println("shutting down ai-service...")
-	grpcServer.GracefulStop()
-	log.Println("ai-service stopped")
+	return viper.ReadInConfig()
+}
+
+func getEnvAsInt(key string, fallback int) int {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+
+	return parsed
 }

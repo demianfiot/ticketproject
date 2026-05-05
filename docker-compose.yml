@@ -3,7 +3,7 @@ services:
   ticket-service:
     build: ./ticket-service
     env_file:
-      - .env
+      - ticket-service/.env
     ports:
       - "8080:8080"
     depends_on:
@@ -17,11 +17,12 @@ services:
         condition: service_started
     networks:
       - ticket-network
+    restart: unless-stopped
 
   auth-service:
     build: ./auth-service
     env_file:
-      - .env
+      - auth-service/.env
     ports:
       - "8081:8081"
     depends_on:
@@ -29,13 +30,17 @@ services:
         condition: service_healthy
     networks:
       - ticket-network
+    restart: unless-stopped
 
   ai-service:
     build: ./ai-service
+    env_file:
+      - ai-service/.env
     ports:
       - "50051:50051"
     networks:
       - ticket-network
+    restart: unless-stopped
 
   consumer:
     build:
@@ -50,6 +55,7 @@ services:
         condition: service_healthy
     networks:
       - ticket-network
+    restart: unless-stopped
 
   postgres:
     image: postgres:15-alpine
@@ -97,6 +103,7 @@ services:
       - "19092:19092"
     networks:
       - ticket-network
+    restart: unless-stopped
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
@@ -118,6 +125,7 @@ services:
       start_period: 30s
     networks:
       - ticket-network
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus
@@ -130,6 +138,7 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - ticket-network
+    restart: unless-stopped
   
   grafana:
     image: grafana/grafana
@@ -138,6 +147,7 @@ services:
       - "3000:3000"
     networks:
       - ticket-network
+    restart: unless-stopped
 
 volumes:
   postgres_data:

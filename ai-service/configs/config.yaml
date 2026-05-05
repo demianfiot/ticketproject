@@ -1,0 +1,7 @@
+server:
+  grpc_port: "50051"
+
+openai:
+  model: "gpt-5.4-mini"
+  base_url: "https://api.openai.com/v1/responses"
+  timeout_seconds: 20

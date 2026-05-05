@@ -20,9 +20,7 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println(".env file not loaded")
-	}
+	_ = godotenv.Load(".env")
 	logrus.SetFormatter(new(logrus.JSONFormatter))
 	dbConfig := DBConfigFromEnv()
 	bd, err := NewPostgresDB(dbConfig)

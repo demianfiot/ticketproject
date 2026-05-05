@@ -14,6 +14,7 @@ FROM alpine:latest
 WORKDIR /app
 
 COPY --from=builder /app/ai-service .
+COPY --from=builder /app/configs ./configs
 
 EXPOSE 50051
 

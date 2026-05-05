@@ -27,12 +27,10 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Println(".env file not loaded")
-	}
+	_ = godotenv.Load(".env")
 	logrus.SetFormatter(new(logrus.JSONFormatter))
 
-	aiClient, err := aisvc.NewGRPCClient("localhost:50051")
+	aiClient, err := aisvc.NewGRPCClient("ai-service:50051")
 	if err != nil {
 		log.Fatal(err)
 	}
