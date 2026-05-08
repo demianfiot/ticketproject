@@ -29,8 +29,14 @@ import (
 func main() {
 	_ = godotenv.Load(".env")
 	logrus.SetFormatter(new(logrus.JSONFormatter))
+	if err := initConfig(); err != nil {
+		log.Fatalf("error initializing configs: %s", err)
+	}
 
-	aiClient, err := aisvc.NewGRPCClient("ai-service:50051")
+	aiAddr := viper.GetString("ai.address")
+	log.Println("AI address:", aiAddr)
+
+	aiClient, err := aisvc.NewGRPCClient(aiAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,10 +48,6 @@ func main() {
 		log.Fatal(err)
 	}
 	defer bd.Close()
-	if err := initConfig(); err != nil {
-		log.Fatalf("error initializing configs: %s", err)
-	}
-
 	log.Println("kafka brokers:", viper.GetStringSlice("kafka.bootstrap_servers"))
 	log.Println("kafka topic:", viper.GetString("kafka.topic_tickets"))
 	producer := events.NewKafkaProducer(

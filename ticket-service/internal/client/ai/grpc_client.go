@@ -53,7 +53,7 @@ func (c *GRPCClient) AnalyzeTicket(ctx context.Context, in AnalyzeInput) (Analyz
 	var lastErr error
 
 	for attempt := 1; attempt <= 3; attempt++ {
-		callCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		callCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 
 		resp, err := c.client.AnalyzeTicket(callCtx, &aipb.AnalyzeTicketRequest{
 			TicketId:    in.TicketID,
